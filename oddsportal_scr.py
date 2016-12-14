@@ -11,23 +11,43 @@ import pandas as pd
 from collections import namedtuple
 
 
-WAIT_TIME = 40
+WAIT_TIME = 40  # max waiting time for a page to load
 year = 2016
+comps = "MS"  # simply list competitions you want here, e.g. "MS WS"
 
-TennisMatch = namedtuple("TennisMatch", "date time p1 p2 score")
-list_matches = []
+abbr_dict = {"MS" : "Men's Singles", 
+				"WS" : "Women's Singles"}
 
+assert year > 2008, ("sorry, there\'s no data for year {} that you\'ve picked." 
+						"you may want to choose another year from 2009 and on..".format(y_from))
+
+#driver = webdriver.PhantomJS()
 driver = webdriver.Chrome('/Users/ik/Codes//oddsportal-scraping/chromedriver')
 
-print("""-------> scraping aopen.com""")
+
+
+what_click_comps = {"MS": "ATP Australian Open", "WS": "WTA Australian Open"}
+TennisMatch = namedtuple("TennisMatch", "date time p1 p2 score")
+
+list_matches = []
+
+print("-------> scraping oddsportal.com")
 
 driver.get("http://www.oddsportal.com/results/")
 
+# select the Melbourne time zone
 WebDriverWait(driver, WAIT_TIME).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "#user-header-timezone-expander"))).click()
 WebDriverWait(driver, WAIT_TIME).until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, "Melbourne"))).click()
+
+# now go to Tennis
 WebDriverWait(driver, WAIT_TIME).until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, "Tennis"))).click()
-WebDriverWait(driver, WAIT_TIME).until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, "ATP Australian Open"))).click()
+
+# what competition?
+print("extracting the {} tournament ...".format(abbr_dict[comps]))
+WebDriverWait(driver, WAIT_TIME).until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, what_click_comps[comps]))).click()
+# and the year?
 WebDriverWait(driver, WAIT_TIME).until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, str(year)))).click()
+# go to the very last page
 WebDriverWait(driver, WAIT_TIME).until(EC.element_to_be_clickable((By.LINK_TEXT, "»|"))).click()
 # wait until this stuff becomes clickable (it's at the bottom of the page)
 WebDriverWait(driver, WAIT_TIME).until(EC.element_to_be_clickable((By.LINK_TEXT, "«")))
@@ -70,9 +90,6 @@ while True:
 			# check if this is a typical result row
 			try:
 				result_tds = row.find_elements_by_xpath(".//td[@class]")
-				# print("found tds..")
-				# for td in result_tds:
-				# 	print(td.text)
 	
 				if len(result_tds) > 3:  # has to be the proper result row
 					# print("here tds more than 3...")
@@ -105,7 +122,13 @@ while True:
 		print("error! couldn\'t find the active page span on the pagination bar!")
 		
 print("done. got {} matches".format(len(list_matches)))
-print(list_matches[-10:])
+
+df = pd.DataFrame(columns="date time player1 player2 score".split())
+
+for i, row in enumerate(list_matches):
+	df.loc[i] = row
+	
+print(df.head())
 driver.quit()
 
 
