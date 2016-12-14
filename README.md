@@ -1,6 +1,7 @@
 ## Scrape [OddsPortal.com][1]
 ---- 
 The purpose of this script is to scrape the Australian Open match results and specifically, the **actual** times when matches started. A few things to keep in mind:
+
 1. You need to install [Selenium][2] 
 2. You also need to either install [PhantomJs][3] for the headless (invisible) browsing or in case you would like to watch your browser grabbing the data, you need to download a web driver, e.g. [ChromeDriver][4] to use Chrome
 3. The data available on OddsPortal.com covers years **2009 to 2016**. Should you try to ask for any other years, the script will do nothing and suggest that you think again
