@@ -10,6 +10,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
 import time
+from datetime import datetime
 import pandas as pd
 from collections import namedtuple
 
@@ -18,7 +19,7 @@ WAIT_TIME = 40  # max waiting time for a page to load
 y_from =2009
 y_to = 2016
 
-comps = "MS"  # simply list competitions you want here, e.g. "MS WS"
+comps = "MS WS"  # simply list competitions you want here, e.g. "MS WS"
 
 abbr_dict = {"MS" : "Men's Singles", 
 				"WS" : "Women's Singles"}
@@ -29,7 +30,7 @@ assert y_from <= y_to, ("Please, make sure that the earliest year you pick is no
 
 # choose driver = webdriver.PhantomJS() for headless browsing!
 driver = webdriver.Chrome('/Users/ik/Codes/oddsportal-scraping/chromedriver')
-
+# driver = webdriver.PhantomJS()
 
 
 what_click_comps = {"MS": "ATP Australian Open", "WS": "WTA Australian Open"}
@@ -40,7 +41,6 @@ list_matches = []
 print("-------> scraping oddsportal.com")
 
 driver.get("http://www.oddsportal.com/results/")
-
 # select the Melbourne time zone
 WebDriverWait(driver, WAIT_TIME).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "#user-header-timezone-expander"))).click()
 WebDriverWait(driver, WAIT_TIME).until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, "Melbourne"))).click()
@@ -48,80 +48,88 @@ WebDriverWait(driver, WAIT_TIME).until(EC.element_to_be_clickable((By.PARTIAL_LI
 # now go to Tennis
 WebDriverWait(driver, WAIT_TIME).until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, "Tennis"))).click()
 
-# what competition?
-print("extracting the {} tournament...".format(abbr_dict[comps]))
-WebDriverWait(driver, WAIT_TIME).until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, what_click_comps[comps]))).click()
-# and the year?
+page_to_go_back_to = driver.current_url
 
-for year in range(y_from, y_to +1):
 
-	print("scraping year {}...".format(year))
-	WebDriverWait(driver, WAIT_TIME).until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, str(year)))).click()
-	# go to the very last page
-	WebDriverWait(driver, WAIT_TIME).until(EC.element_to_be_clickable((By.LINK_TEXT, "»|"))).click()
-	# wait until this stuff becomes clickable (it's at the bottom of the page)
-	WebDriverWait(driver, WAIT_TIME).until(EC.element_to_be_clickable((By.LINK_TEXT, "«")))
+for i, comp in enumerate(comps.split()):
+
+	if i > 0:
+		driver.get(page_to_go_back_to)
 	
-	"""
-	the idea here is to simply locate the main table first and then go through every row; as we go, we check whether the row is a header with 
-	the date and round information or a match result row or something else;
-	if it turns out to be a header, we update the date which will then be attached to all subsequently found match results.
-	"""
+	# what competition?
+	print("extracting the {} tournament...".format(abbr_dict[comp]))
+	WebDriverWait(driver, WAIT_TIME).until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, what_click_comps[comp]))).click()
+	# and the year?
 	
-	while True:
+	for year in range(y_from, y_to +1):
 	
-		# find the pagination bar that has an id=pagination
-		try:
-			pagination_bar = driver.find_element_by_xpath("//div[@id='pagination']")
-		except NoSuchElementException:
-			print("error! couldn\'t find the pagination bar on the page!")
-	
-		#
-		# find the table; there's supposed to be only one table like this on the page
-		#
+		print("scraping year {}...".format(year))
+		WebDriverWait(driver, WAIT_TIME).until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, str(year)))).click()
+		# go to the very last page
+		WebDriverWait(driver, WAIT_TIME).until(EC.element_to_be_clickable((By.LINK_TEXT, "»|"))).click()
+		# wait until this stuff becomes clickable (it's at the bottom of the page)
+		WebDriverWait(driver, WAIT_TIME).until(EC.element_to_be_clickable((By.LINK_TEXT, "«")))
 		
-		try:
-			tbl = driver.find_element_by_xpath("//table[@id='tournamentTable']")
-		except NoSuchElementException:
-			print("error! couldn\'t find the main table on the page!")
+		"""
+		the idea here is to simply locate the main table first and then go through every row; as we go, we check whether the row is a header with 
+		the date and round information or a match result row or something else;
+		if it turns out to be a header, we update the date which will then be attached to all subsequently found match results.
+		"""
 		
-		#
-		# ok, now go through all rows of this table
-		#
-		for row in tbl.find_elements_by_xpath(".//tbody/tr"):
-			# check if this row is a header
+		while True:
+		
+			# find the pagination bar that has an id=pagination
 			try:
-				date_round_span = row.find_element_by_xpath(".//th[@colspan='4']/span[@*]")
-				dte = date_round_span.text  # grab the date, which has the form  like 13 Jan 2016
+				pagination_bar = driver.find_element_by_xpath("//div[@id='pagination']")
+			except NoSuchElementException:
+				print("error! couldn\'t find the pagination bar on the page!")
+		
+			#
+			# find the table; there's supposed to be only one table like this on the page
+			#
 			
-			except NoSuchElementException:  # this isn't a date-round row
-				# check if this is a typical result row
+			try:
+				tbl = driver.find_element_by_xpath("//table[@id='tournamentTable']")
+			except NoSuchElementException:
+				print("error! couldn\'t find the main table on the page!")
+			
+			#
+			# ok, now go through all rows of this table
+			#
+			for row in tbl.find_elements_by_xpath(".//tbody/tr"):
+				# check if this row is a header
 				try:
-					result_tds = row.find_elements_by_xpath(".//td[@class]")
-		
-					if len(result_tds) > 3:  # has to be the proper result row
-						starting_time, players, score = [w.text.strip() for w in result_tds[:3]]
-						p1, p2 = map(lambda _: _.strip(), players.split(" - "))
-						list_matches.append(TennisMatch(dte, starting_time, p1, p2, score))
-					else:
-						continue
-		
-				except NoSuchElementException:
-					continue # do nothing
+					date_round_span = row.find_element_by_xpath(".//th[@colspan='4']/span[@*]")
+					dte = date_round_span.text  # grab the date, which has the form  like 13 Jan 2016
 				
-		# time to move to the next page
-	
-		try:
-			active_page_span = pagination_bar.find_element_by_xpath(".//span[@class='active-page']")
+				except NoSuchElementException:  # this isn't a date-round row
+					# check if this is a typical result row
+					try:
+						result_tds = row.find_elements_by_xpath(".//td[@class]")
 			
-			if not active_page_span.text.strip() == "1":
-				# do another click
-				WebDriverWait(driver, WAIT_TIME).until(EC.element_to_be_clickable((By.LINK_TEXT, "«"))).click()
-				WebDriverWait(driver, WAIT_TIME).until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, "»|")))
-			else:
-				break
-		except NoSuchElementException:
-			print("error! couldn\'t find the active page span on the pagination bar!")
+						if len(result_tds) > 3:  # has to be the proper result row
+							starting_time, players, score = [w.text.strip() for w in result_tds[:3]]
+							p1, p2 = map(lambda _: _.strip(), players.split(" - "))
+							list_matches.append(TennisMatch(dte, starting_time, p1, p2, score))
+						else:
+							continue
+			
+					except NoSuchElementException:
+						continue # do nothing
+					
+			# time to move to the next page
+		
+			try:
+				active_page_span = pagination_bar.find_element_by_xpath(".//span[@class='active-page']")
+				
+				if not active_page_span.text.strip() == "1":
+					# do another click
+					WebDriverWait(driver, WAIT_TIME).until(EC.element_to_be_clickable((By.LINK_TEXT, "«"))).click()
+					WebDriverWait(driver, WAIT_TIME).until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, "»|")))
+				else:
+					break
+			except NoSuchElementException:
+				print("error! couldn\'t find the active page span on the pagination bar!")
 		
 driver.quit()
 
