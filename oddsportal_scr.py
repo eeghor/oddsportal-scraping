@@ -134,7 +134,7 @@ for i, row in enumerate(list_matches):
 	
 csv_fl = "scraped_oddportal_data_" + "_".join(comps.split()) + "_" + str(y_from) + "_" + str(y_to) + ".csv"
 
-df.to_csv(csv_fl, index=False)
+df.to_csv(csv_fl, index=False, sep="\t")
 
 print("saved everything in the file called {} in your local directory".format(csv_fl))
 
